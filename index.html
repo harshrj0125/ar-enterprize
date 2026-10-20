@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR Enterprise Billing</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #fff; --ink: #1d2433; --muted: #6b7385; --line: #e2e5eb;
+    --accent: #c8102e; --accent-ink: #fff; --chip: #f1f3f7; --chip-hover: #ffe8ec; --ok: #0f7b3e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
+  input, select, button { font: inherit; color: inherit; }
+  input, select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: #fff; }
+  input:focus, select:focus { outline: 2px solid #f3a6b3; border-color: var(--accent); }
+  button { cursor: pointer; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 7px 12px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.ghost { background: transparent; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .app { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; padding: 16px; height: 100vh; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; flex-direction: column; min-height: 0; }
+
+  /* Product picker */
+  .picker-head { padding: 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+  .picker-head input[type=search] { width: 100%; padding: 9px 10px; font-size: 15px; }
+  .cats { display: flex; gap: 6px; flex-wrap: wrap; }
+  .cats button { padding: 4px 10px; border-radius: 999px; font-size: 12px; background: var(--chip); border-color: transparent; }
+  .cats button.on { background: var(--accent); color: #fff; }
+  .plist { overflow: auto; padding: 4px 12px 12px; }
+  .cat-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 14px 0 4px; }
+  .prod { padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .prod-name { font-weight: 600; margin-bottom: 6px; }
+  .sizes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .size { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 8px; border-radius: 6px; background: var(--chip); border: 1px solid transparent; font-size: 13px; }
+  .size:hover { background: var(--chip-hover); border-color: #f3a6b3; }
+  .size b { font-weight: 600; }
+  .size span { color: var(--muted); font-size: 12px; }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+
+  /* Bill */
+  .bill { overflow: auto; }
+  .bill-inner { padding: 20px 24px; }
+  .shop { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+  .shop-name { font-size: 22px; font-weight: 800; letter-spacing: .02em; }
+  .editable { border: 1px dashed transparent; border-radius: 4px; padding: 0 3px; min-width: 40px; display: inline-block; }
+  .editable:hover, .editable:focus { border-color: var(--line); outline: none; background: #fffdf3; }
+  .shop small { display: block; color: var(--muted); }
+  .bill-title { text-align: right; }
+  .bill-title h2 { margin: 0; font-size: 18px; letter-spacing: .1em; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin: 14px 0; }
+  .meta label { display: flex; align-items: center; gap: 8px; }
+  .meta label span { width: 80px; color: var(--muted); font-size: 12px; }
+  .meta input { flex: 1; min-width: 0; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--ink); padding: 6px 4px; }
+  td { border-bottom: 1px solid var(--line); padding: 4px; vertical-align: middle; }
+  td input { width: 100%; padding: 4px 6px; text-align: right; }
+  td.item small { color: var(--muted); }
+  .col-sn { width: 32px; } .col-qty { width: 70px; } .col-rate { width: 90px; } .col-disc { width: 70px; } .col-amt { width: 110px; } .col-x { width: 32px; }
+  .del { border: 0; background: none; color: var(--muted); font-size: 18px; padding: 0 6px; }
+  .del:hover { color: var(--accent); }
+  .no-items td { text-align: center; color: var(--muted); padding: 28px; }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 14px 0; padding: 10px 12px; background: var(--chip); border-radius: 8px; font-size: 13px; }
+  .tools label { display: inline-flex; gap: 6px; align-items: center; }
+  .tools input { width: 64px; padding: 4px 6px; }
+
+  .bottom { display: grid; grid-template-columns: 1fr 300px; gap: 24px; margin-top: 8px; }
+  .words { color: var(--muted); font-size: 13px; align-self: end; }
+  .words b { color: var(--ink); display: block; margin-top: 2px; }
+  .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
+  .totals .grand { border-top: 2px solid var(--ink); margin-top: 6px; padding-top: 8px; font-size: 20px; font-weight: 800; }
+  .totals .disc { color: var(--ok); }
+  .totals select { padding: 2px 4px; }
+  .sign { display: flex; justify-content: space-between; margin-top: 48px; color: var(--muted); font-size: 12px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 24px; border-top: 1px solid var(--line); background: #fafbfc; border-radius: 0 0 10px 10px; }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; height: auto; }
+    .plist { max-height: 50vh; }
+    .meta, .bottom { grid-template-columns: 1fr; }
+    .bill-inner { padding: 16px; }
+  }
+
+  @media print {
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff; }
+    .app { display: block; padding: 0; height: auto; }
+    .panel { border: 0; }
+    .picker, .actions, .tools, .col-x, .del, .print-hide { display: none !important; }
+    .bill { overflow: visible; }
+    .bill-inner { padding: 0; }
+    input, select { border: 0; padding: 0; background: none; appearance: none; -webkit-appearance: none; }
+    td input { text-align: right; }
+    .editable { border: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Product picker -->
+  <section class="panel picker">
+    <div class="picker-head">
+      <input type="search" id="q" placeholder="Search product… e.g. cpvc elbow 20, swr bend 110" autofocus>
+      <div class="cats" id="cats"></div>
+    </div>
+    <div class="plist" id="plist"></div>
+  </section>
+
+  <!-- Bill -->
+  <section class="panel">
+    <div class="bill">
+      <div class="bill-inner">
+        <div class="shop">
+          <div>
+            <div class="shop-name editable" contenteditable="true" data-shop="name">AR ENTERPRISE</div>
+            <small class="editable" contenteditable="true" data-shop="addr">Raghvendra Vatika, Taret-pali Road, Naubatpur, Patna 801109</small>
+            <small class="editable" contenteditable="true" data-shop="phone">Mobile: +91 96080 93105</small>
+            <small class="editable" contenteditable="true" data-shop="gst">GSTIN: 10DVHPK8909R1ZY</small>
+          </div>
+          <div class="bill-title">
+            <h2>INVOICE</h2>
+            <small style="color:var(--muted)">Supreme Pipes &amp; Fittings</small>
+          </div>
+        </div>
+
+        <div class="meta">
+          <label><span>Customer</span><input id="cust" placeholder="Customer name"></label>
+          <label><span>Bill No.</span><input id="billno"></label>
+          <label><span>Mobile</span><input id="mobile" placeholder="Mobile number"></label>
+          <label><span>Date</span><input id="date" type="date"></label>
+        </div>
+
+        <div class="tools">
+          <strong>Quick discount:</strong>
+          <label>Pipes % <input id="dPipe" type="number" min="0" max="100" step="0.5"></label>
+          <label>Fittings % <input id="dFit" type="number" min="0" max="100" step="0.5"></label>
+          <button id="applyDisc">Apply to all rows</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th class="col-sn">#</th>
+              <th>Item</th>
+              <th class="col-qty num">Qty</th>
+              <th class="col-rate num">Rate (₹)</th>
+              <th class="col-disc num">Disc %</th>
+              <th class="col-amt num">Amount (₹)</th>
+              <th class="col-x"></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+
+        <div class="bottom">
+          <div class="words">Amount in words<b id="words">—</b></div>
+          <div class="totals">
+            <div><span>Total (list price)</span><span class="num" id="tGross">0.00</span></div>
+            <div class="disc"><span>Discount</span><span class="num" id="tDisc">0.00</span></div>
+            <div><span>Taxable amount</span><span class="num" id="tTaxable">0.00</span></div>
+            <div>
+              <span>GST
+                <select id="gst">
+                  <option value="0">0%</option><option value="5">5%</option>
+                  <option value="12">12%</option><option value="18">18%</option>
+                </select>
+              </span>
+              <span class="num" id="tGst">0.00</span>
+            </div>
+            <div><span>Round off</span><span class="num" id="tRound">0.00</span></div>
+            <div class="grand"><span>Grand Total</span><span class="num" id="tGrand">₹0</span></div>
+          </div>
+        </div>
+
+        <div class="sign"><span>Customer signature</span><span>For <span id="signName">AR ENTERPRISE</span></span></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="clearBtn">Clear items</button>
+      <button id="newBtn">New bill</button>
+      <button class="primary" id="printBtn">Print / Save PDF</button>
+    </div>
+  </section>
+</div>
+
+<script src="products.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const STORE = "ar-billing-v1";
+  const fmt = (n) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  // ---------- persistence (browser only, survives refresh) ----------
+  const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
+  const saved = load();
+  const state = {
+    shop: saved.shop || {},
+    nextBill: saved.nextBill || 1,
+    bill: saved.bill || null,
+    dPipe: saved.dPipe ?? "",
+    dFit: saved.dFit ?? "",
+  };
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {} };
+
+  const blankBill = () => ({ no: String(state.nextBill), date: today(), cust: "", mobile: "", gst: 0, rows: [] });
+  if (!state.bill) state.bill = blankBill();
+
+  // ---------- product picker ----------
+  let activeCat = "all";
+  const kindOf = (cat, item) => item.kind || (cat.kind === "pipe" ? "pipe" : "fitting");
+
+  function renderCats() {
+    const all = [{ id: "all", name: "All" }, ...CATALOG];
+    $("cats").innerHTML = all.map((c) =>
+      `<button data-cat="${c.id}" class="${c.id === activeCat ? "on" : ""}">${esc(c.name)}</button>`).join("");
+  }
+
+  function renderProducts() {
+    const terms = $("q").value.toLowerCase().split(/\s+/).filter(Boolean);
+    let html = "";
+    CATALOG.forEach((cat, ci) => {
+      if (activeCat !== "all" && activeCat !== cat.id) return;
+      let block = "";
+      cat.items.forEach((item, ii) => {
+        const sizes = item.v
+          .map(([size, price], vi) => ({ size, price, vi }))
+          .filter(({ size }) => {
+            const hay = `${item.name} ${cat.name} ${size}`.toLowerCase();
+            return terms.every((t) => hay.includes(t));
+          });
+        if (!sizes.length) return;
+        block += `<div class="prod"><div class="prod-name">${esc(item.name)}</div><div class="sizes">` +
+          sizes.map((s) => `<button class="size" data-k="${ci}.${ii}.${s.vi}" title="Add to bill"><b>${esc(s.size)}</b><span>₹${s.price}</span></button>`).join("") +
+          `</div></div>`;
+      });
+      if (block) html += `<div class="cat-title">${esc(cat.name)}</div>` + block;
+    });
+    $("plist").innerHTML = html || `<div class="empty">No product matches “${esc($("q").value)}”</div>`;
+  }
+
+  function addProduct(key) {
+    const [ci, ii, vi] = key.split(".").map(Number);
+    const cat = CATALOG[ci], item = cat.items[ii], [size, price] = item.v[vi];
+    const existing = state.bill.rows.find((r) => r.key === key);
+    if (existing) existing.qty += 1;
+    else {
+      const kind = kindOf(cat, item);
+      const d = kind === "pipe" ? state.dPipe : state.dFit;
+      state.bill.rows.push({ key, name: item.name, size, rate: price, qty: 1, disc: Number(d) || 0, kind });
+    }
+    renderRows();
+  }
+
+  // ---------- bill ----------
+  const lineAmt = (r) => r.qty * r.rate * (1 - r.disc / 100);
+
+  function renderRows() {
+    const rows = state.bill.rows;
+    $("rows").innerHTML = rows.length ? rows.map((r, i) => `
+      <tr data-i="${i}">
+        <td>${i + 1}</td>
+        <td class="item">${esc(r.name)} <small>${esc(r.size)}</small></td>
+        <td><input type="number" min="0" step="1" data-f="qty" value="${r.qty}"></td>
+        <td><input type="number" min="0" step="0.01" data-f="rate" value="${r.rate}"></td>
+        <td><input type="number" min="0" max="100" step="0.5" data-f="disc" value="${r.disc}"></td>
+        <td class="num" data-amt>${fmt(lineAmt(r))}</td>
+        <td class="col-x"><button class="del" data-del="${i}" title="Remove">×</button></td>
+      </tr>`).join("")
+      : `<tr class="no-items"><td colspan="7">Click a product size on the left to add it to the bill</td></tr>`;
+    renderTotals();
+  }
+
+  function renderTotals() {
+    const rows = state.bill.rows;
+    const gross = rows.reduce((s, r) => s + r.qty * r.rate, 0);
+    const taxable = rows.reduce((s, r) => s + lineAmt(r), 0);
+    const gst = taxable * state.bill.gst / 100;
+    const exact = taxable + gst;
+    const grand = Math.round(exact);
+    $("tGross").textContent = fmt(gross);
+    $("tDisc").textContent = "− " + fmt(gross - taxable);
+    $("tTaxable").textContent = fmt(taxable);
+    $("tGst").textContent = fmt(gst);
+    $("tRound").textContent = (grand - exact >= 0 ? "+ " : "− ") + fmt(Math.abs(grand - exact));
+    $("tGrand").textContent = "₹" + grand.toLocaleString("en-IN");
+    $("words").textContent = grand ? toWords(grand) + " Rupees Only" : "—";
+    save();
+  }
+
+  function renderMeta() {
+    const b = state.bill;
+    $("billno").value = b.no; $("date").value = b.date; $("cust").value = b.cust;
+    $("mobile").value = b.mobile; $("gst").value = String(b.gst);
+    $("dPipe").value = state.dPipe; $("dFit").value = state.dFit;
+    document.querySelectorAll("[data-shop]").forEach((el) => {
+      const v = state.shop[el.dataset.shop];
+      if (v != null) el.textContent = v;
+    });
+    $("signName").textContent = document.querySelector('[data-shop="name"]').textContent;
+  }
+
+  // Indian number system words
+  function toWords(n) {
+    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+      "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const two = (x) => x < 20 ? a[x] : b[Math.floor(x / 10)] + (x % 10 ? " " + a[x % 10] : "");
+    const three = (x) => (x >= 100 ? a[Math.floor(x / 100)] + " Hundred" + (x % 100 ? " " : "") : "") + two(x % 100);
+    const parts = [];
+    const crore = Math.floor(n / 1e7); n %= 1e7;
+    const lakh = Math.floor(n / 1e5); n %= 1e5;
+    const thou = Math.floor(n / 1e3); n %= 1e3;
+    if (crore) parts.push(three(crore) + " Crore");
+    if (lakh) parts.push(two(lakh) + " Lakh");
+    if (thou) parts.push(two(thou) + " Thousand");
+    if (n) parts.push(three(n));
+    return parts.join(" ");
+  }
+
+  // ---------- events ----------
+  $("q").addEventListener("input", renderProducts);
+  $("cats").addEventListener("click", (e) => {
+    const c = e.target.closest("[data-cat]"); if (!c) return;
+    activeCat = c.dataset.cat; renderCats(); renderProducts();
+  });
+  $("plist").addEventListener("click", (e) => {
+    const s = e.target.closest("[data-k]"); if (s) addProduct(s.dataset.k);
+  });
+  $("q").addEventListener("keydown", (e) => {
+    // Enter adds the first matching size
+    if (e.key === "Enter") { const first = $("plist").querySelector("[data-k]"); if (first) addProduct(first.dataset.k); }
+  });
+
+  $("rows").addEventListener("input", (e) => {
+    const f = e.target.dataset.f; if (!f) return;
+    const tr = e.target.closest("tr"), r = state.bill.rows[tr.dataset.i];
+    r[f] = Math.max(0, Number(e.target.value) || 0);
+    if (f === "disc") r.disc = Math.min(100, r.disc);
+    tr.querySelector("[data-amt]").textContent = fmt(lineAmt(r));
+    renderTotals();
+  });
+  $("rows").addEventListener("click", (e) => {
+    const d = e.target.closest("[data-del]"); if (!d) return;
+    state.bill.rows.splice(Number(d.dataset.del), 1); renderRows();
+  });
+
+  [["cust", "cust"], ["mobile", "mobile"], ["billno", "no"], ["date", "date"]].forEach(([id, key]) =>
+    $(id).addEventListener("input", () => { state.bill[key] = $(id).value; save(); }));
+  $("gst").addEventListener("change", () => { state.bill.gst = Number($("gst").value); renderTotals(); });
+  $("dPipe").addEventListener("input", () => { state.dPipe = $("dPipe").value; save(); });
+  $("dFit").addEventListener("input", () => { state.dFit = $("dFit").value; save(); });
+  $("applyDisc").addEventListener("click", () => {
+    state.bill.rows.forEach((r) => { r.disc = Number(r.kind === "pipe" ? state.dPipe : state.dFit) || 0; });
+    renderRows();
+  });
+
+  document.querySelectorAll("[data-shop]").forEach((el) => el.addEventListener("input", () => {
+    state.shop[el.dataset.shop] = el.textContent;
+    $("signName").textContent = document.querySelector('[data-shop="name"]').textContent;
+    save();
+  }));
+
+  $("clearBtn").addEventListener("click", () => {
+    if (state.bill.rows.length && confirm("Remove all items from this bill?")) { state.bill.rows = []; renderRows(); }
+  });
+  $("newBtn").addEventListener("click", () => {
+    if (state.bill.rows.length && !confirm("Start a new bill? The current bill will be cleared.")) return;
+    const n = parseInt(state.bill.no, 10);
+    state.nextBill = (Number.isFinite(n) ? n : state.nextBill) + 1;
+    state.bill = blankBill(); renderMeta(); renderRows(); $("q").focus();
+  });
+  $("printBtn").addEventListener("click", () => window.print());
+
+  renderCats(); renderProducts(); renderMeta(); renderRows();
+})();
+</script>
+</body>
+</html>
